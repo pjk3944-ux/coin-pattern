@@ -1,0 +1,52 @@
+{
+  "api_version": "v1.1-prepayment",
+  "purpose": "Coin Pattern member/subscription/PRO entitlement contract",
+  "rules": {
+    "server_is_source_of_truth": true,
+    "client_must_not_unlock_from_local_files": true,
+    "payment_webhook_must_be_verified_server_side": true
+  },
+  "endpoints": {
+    "me": {
+      "method": "GET",
+      "path": "/v1/me"
+    },
+    "subscription": {
+      "method": "GET",
+      "path": "/v1/subscription"
+    },
+    "entitlement": {
+      "method": "GET",
+      "path": "/v1/entitlement"
+    },
+    "logout": {
+      "method": "POST",
+      "path": "/v1/logout"
+    }
+  },
+  "member": {
+    "id": "string",
+    "email": "string",
+    "created_at": "ISO-8601"
+  },
+  "subscription": {
+    "plan": "FREE|PRO",
+    "status": "active|trialing|past_due|canceled|expired",
+    "current_period_end": "ISO-8601|null",
+    "provider": "string|null",
+    "provider_customer_id": "string|null",
+    "provider_subscription_id": "string|null"
+  },
+  "entitlement": {
+    "pro": "boolean",
+    "checked_at": "ISO-8601",
+    "expires_at": "ISO-8601|null"
+  },
+  "webhook": {
+    "path": "/v1/webhooks/payment",
+    "method": "POST",
+    "signature": "HMAC-SHA256",
+    "idempotency_key": "event_id",
+    "provider_connected": false
+  }
+}

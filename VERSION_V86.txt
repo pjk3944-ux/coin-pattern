@@ -1,0 +1,5 @@
+Coin Pattern Beta v86 — Analysis Records UI
+
+- Replaced raw st.json / st.dataframe analysis record view with dark premium cards
+- Shows analysis time, markets, source rows, pattern count, A→B backtest metrics, and self-continuation diagnostic
+- Preserves v85 daily detail usage UI and all existing startup/data behavior
