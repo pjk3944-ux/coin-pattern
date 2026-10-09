@@ -18,7 +18,7 @@ s=requests.Session(); s.headers['User-Agent']='CoinPatternFinal/1.0'
 SECTORS={'VIRTUAL':'AI','TAO':'AI','FET':'AI','RNDR':'AI','WLD':'AI','ONDO':'RWA','ENA':'RWA','MKR':'RWA','PENDLE':'RWA','LINK':'Oracle','API3':'Oracle','PYTH':'Oracle','AAVE':'DeFi','UNI':'DeFi','CRV':'DeFi','COMP':'DeFi','DYDX':'DeFi','JUP':'DeFi','WIF':'MEME','DOGE':'MEME','SHIB':'MEME','PEPE':'MEME','BONK':'MEME','FLOKI':'MEME','IMX':'Gaming','GALA':'Gaming','BEAM':'Gaming','AXS':'Gaming','SAND':'Gaming','MANA':'Gaming','ARB':'Layer2','OP':'Layer2','MATIC':'Layer2','SOL':'Layer1','ADA':'Layer1','AVAX':'Layer1','DOT':'Layer1','ATOM':'Layer1','NEAR':'Layer1','SUI':'Layer1','APT':'Layer1','FIL':'Infra','AR':'Infra','GRT':'Infra','AKT':'DePIN','HNT':'DePIN','STORJ':'DePIN'}
 
 def dbs():
-    DATA.mkdir(exist_ok=True); OUT.mkdir(exist_ok=True)
+    DATA.mkdir(parents=True, exist_ok=True); OUT.mkdir(parents=True, exist_ok=True)
     with sqlite3.connect(UPDB) as c: c.execute('CREATE TABLE IF NOT EXISTS daily(market,date,open,high,low,close,volume,value,PRIMARY KEY(market,date))')
     with sqlite3.connect(BNDB) as c: c.execute('CREATE TABLE IF NOT EXISTS daily(symbol,date,open,high,low,close,volume,PRIMARY KEY(symbol,date))')
 
@@ -48,6 +48,11 @@ def sync_up(markets):
         for i,m in enumerate(markets,1):
             try:
                 have=c.execute('SELECT COUNT(*) FROM daily WHERE market=?',(m,)).fetchone()[0]
+                # In full-bootstrap mode, successfully committed history is reusable.
+                # sync_up commits only after the complete pagination loop succeeds.
+                if MODE=='full' and have >= 200:
+                    print(f'[Upbit] {i}/{len(markets)} {m} cached history reused ({have} rows)')
+                    continue
                 if MODE=='cache' and have: continue
                 rows=[]
                 if have and MODE!='full': rows=get(UPBIT+'/v1/candles/days',{'market':m,'count':REFRESH_DAYS})
@@ -72,6 +77,10 @@ def sync_bn(markets,valid):
             if sym not in valid: continue
             try:
                 have=c.execute('SELECT COUNT(*) FROM daily WHERE symbol=?',(sym,)).fetchone()[0]
+                # Reuse completed Binance history after a restart instead of fetching it again.
+                if MODE=='full' and have >= 200:
+                    print(f'[Binance] {i}/{len(markets)} {sym} cached history reused ({have} rows)')
+                    continue
                 if MODE=='cache' and have: continue
                 limit=REFRESH_DAYS if have and MODE!='full' else HISTORY
                 rows=get(BINANCE+'/api/v3/klines',{'symbol':sym,'interval':'1d','limit':limit})

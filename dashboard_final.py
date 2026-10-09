@@ -843,9 +843,11 @@ def render_daily_pulse(c, live_ok):
         rank_text='새 등장' if pd.isna(r.get('prev_rank')) else f'{safe_int(r.get("prev_rank"))}위 → {safe_int(r.get("rank"))}위'
         st.markdown(f'<div class="rank-card"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px"><div><div class="coin-ticker">🔵 {ticker(r.get("market"))}</div><div class="coin-price">관심 점수 {safe_float(r.get("score")):.1f} · 전 분석일 {safe_float(r.get("prev_score")):.1f} · {rank_text}</div></div><div style="text-align:right"><div style="font-size:20px;font-weight:900">{delta:+.1f}점</div><div class="change {cls}" style="font-size:15px">현재 {live:+.1%}</div></div></div></div>', unsafe_allow_html=True)
 
-LOCK = ROOT / '.first_analysis.lock'
-LOG = ROOT / 'first_analysis.log'
-STATUS = ROOT / 'first_analysis_status.txt'
+RUNTIME_DIR = APP_HOME / 'runtime'
+LOCK = RUNTIME_DIR / '.first_analysis.lock'
+LOG = RUNTIME_DIR / 'first_analysis.log'
+STATUS = RUNTIME_DIR / 'first_analysis_status.txt'
+RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
 REQ = ['candidates_final.csv', 'pair_patterns_final.csv', 'pattern_occurrences_final.csv', 'backtest_final.csv', 'last_run_final.json']
 FLOW = OUT / 'leader_flows_final.csv'
 
@@ -1065,17 +1067,39 @@ def load_data():
 
 
 def start_first():
+    # One shared bootstrap per app instance. Create the lock atomically before
+    # spawning the worker so simultaneous visitors cannot launch duplicate jobs.
+    RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
     if LOCK.exists():
+        try:
+            # Recover only from a clearly abandoned lock (e.g. worker was killed).
+            if datetime.now().timestamp() - LOCK.stat().st_mtime > 6 * 60 * 60:
+                LOCK.unlink(missing_ok=True)
+            else:
+                return False
+        except OSError:
+            return False
+    try:
+        fd = os.open(str(LOCK), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        with os.fdopen(fd, 'w', encoding='utf-8') as f:
+            f.write(json.dumps({'pid': os.getpid(), 'started_at': datetime.now().isoformat()}))
+    except FileExistsError:
         return False
-    LOG.write_text('', encoding='utf-8')
-    STATUS.write_text('STARTING', encoding='utf-8')
-    flags = getattr(subprocess, 'CREATE_NO_WINDOW', 0)
-    subprocess.Popen(
-        [sys.executable, str(ROOT / 'first_analysis.py')],
-        cwd=ROOT, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL, creationflags=flags, close_fds=(os.name != 'nt')
-    )
-    return True
+    try:
+        LOG.write_text('', encoding='utf-8')
+        STATUS.write_text('STARTING', encoding='utf-8')
+        flags = getattr(subprocess, 'CREATE_NO_WINDOW', 0)
+        subprocess.Popen(
+            [sys.executable, str(ROOT / 'first_analysis.py')],
+            cwd=ROOT, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL, creationflags=flags, close_fds=(os.name != 'nt')
+        )
+        return True
+    except Exception as e:
+        STATUS.write_text('ERROR:START_FAILED ' + str(e), encoding='utf-8')
+        try: LOCK.unlink(missing_ok=True)
+        except OSError: pass
+        return False
 
 
 def log_tail():

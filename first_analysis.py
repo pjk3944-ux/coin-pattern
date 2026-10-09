@@ -1,9 +1,13 @@
 from pathlib import Path
 import os, subprocess, sys, traceback
 ROOT=Path(__file__).resolve().parent
-LOCK=ROOT/'.first_analysis.lock'
-LOG=ROOT/'first_analysis.log'
-STATUS=ROOT/'first_analysis_status.txt'
+default_home = Path(os.environ.get('LOCALAPPDATA', str(Path.home()/'.coinpattern'))) / 'CoinPattern'
+APP_HOME = Path(os.environ.get('COIN_PATTERN_HOME', str(default_home))).expanduser()
+RUNTIME=APP_HOME/'runtime'
+RUNTIME.mkdir(parents=True, exist_ok=True)
+LOCK=RUNTIME/'.first_analysis.lock'
+LOG=RUNTIME/'first_analysis.log'
+STATUS=RUNTIME/'first_analysis_status.txt'
 try:
     LOCK.write_text('running', encoding='utf-8')
     STATUS.write_text('FIRST ANALYSIS RUNNING', encoding='utf-8')

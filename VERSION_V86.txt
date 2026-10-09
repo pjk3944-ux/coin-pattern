@@ -1,5 +1,8 @@
-Coin Pattern Beta v86 — Analysis Records UI
+Coin Pattern Beta v86 — Web Deployment Fix Pack
 
-- Replaced raw st.json / st.dataframe analysis record view with dark premium cards
-- Shows analysis time, markets, source rows, pattern count, A→B backtest metrics, and self-continuation diagnostic
-- Preserves v85 daily detail usage UI and all existing startup/data behavior
+- Keeps the v86 analysis UI and scoring logic.
+- Adds streamlit_app.py as a valid Streamlit Cloud entry point.
+- Moves bootstrap lock/status/log to the same app data home as analysis output.
+- Creates the bootstrap lock atomically to avoid duplicate first-visit workers.
+- Fixes creation of nested data directories on a fresh Linux host.
+- Documents Streamlit Cloud's ephemeral storage limitation and the persistent-service requirement.
