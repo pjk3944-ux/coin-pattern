@@ -1275,27 +1275,44 @@ def render_header(meta):
     </div>''', unsafe_allow_html=True)
 
 
+@st.fragment(run_every="10s")
 def render_start():
-    st.markdown('<div class="empty"><div style="font-size:36px">◈</div><h3 style="margin:8px 0;color:#fff">아직 서버 분석 결과가 없습니다</h3><p>정식 서비스에서는 730일 원천 데이터를 사용자 기기에서 다운로드하지 않고, 서버가 미리 분석한 결과를 바로 제공합니다.</p></div>', unsafe_allow_html=True)
-    st.info('베타 PC에서 직접 데이터를 구축해야 한다면 아래 관리자용 기능을 사용할 수 있습니다. 정식 출시에서는 이 버튼을 일반 회원에게 노출하지 않습니다.')
-    with st.expander('🛠 베타 관리자용 로컬 데이터 구축', expanded=False):
-        st.caption('730일 Upbit + Binance 데이터 수집은 서버/관리자 작업입니다. 일반 회원의 첫 접속 과정에는 포함되지 않습니다.')
-        c1, c2 = st.columns([1, 1])
-        with c1:
-            if st.button('🚀 관리자용 최초 데이터 구축', type='primary', use_container_width=True):
-                if start_first():
-                    st.rerun()
-                st.warning('이미 데이터 구축이 실행 중입니다.')
-        with c2:
-            if st.button('📂 결과 폴더 확인', use_container_width=True):
-                st.info(f'결과 위치: {OUT}')
-        if LOCK.exists():
-            st.markdown('<div class="status"><b>⏳ 서버 데이터 구축 시뮬레이션 실행 중</b><br>최초 1회만 730일 데이터를 수집합니다.</div>', unsafe_allow_html=True)
-            if st.button('🔄 진행 상황 새로고침', type='primary', key='refresh_bootstrap'):
-                st.rerun()
-            txt = log_tail()
-            if txt:
-                st.markdown(f'<div class="log">{txt}</div>', unsafe_allow_html=True)
+    """Web deployment: automatically start the original 730-day bootstrap on first visit."""
+    # Start once per Streamlit session; users should not need to press an admin bootstrap button.
+    if not st.session_state.get('_cp_auto_bootstrap_attempted', False):
+        st.session_state['_cp_auto_bootstrap_attempted'] = True
+        if not LOCK.exists():
+            started = start_first()
+            if started:
+                st.info('최초 접속 분석을 자동으로 시작했습니다. Upbit + Binance 730일 데이터를 준비하고 있습니다.')
+
+    if has_results():
+        st.success('730일 과거 데이터 분석이 준비되었습니다. 분석 화면으로 이동합니다.')
+        st.rerun()
+        return
+
+    if LOCK.exists() or (STATUS.exists() and STATUS.read_text(encoding='utf-8', errors='replace').startswith('STARTING')):
+        st.markdown('<div class="empty"><div style="font-size:36px">◈</div><h3 style="margin:8px 0;color:#fff">730일 과거 데이터 분석 중입니다</h3><p>처음 한 번만 과거 데이터를 준비합니다. 완료되면 분석 화면이 자동으로 열립니다.</p></div>', unsafe_allow_html=True)
+        txt = log_tail()
+        if txt:
+            st.code(txt[-3500:])
+        if STATUS.exists():
+            status = STATUS.read_text(encoding='utf-8', errors='replace')
+            if status.startswith('ERROR'):
+                st.error('자동 분석 중 오류가 발생했습니다. 아래 실행 기록을 확인해 주세요.')
+                if txt:
+                    st.code(txt[-7000:])
+    else:
+        status = STATUS.read_text(encoding='utf-8', errors='replace') if STATUS.exists() else ''
+        st.markdown('<div class="empty"><div style="font-size:36px">◈</div><h3 style="margin:8px 0;color:#fff">730일 분석을 준비하지 못했습니다</h3><p>서버 실행 환경에서 데이터 수집이 차단되었거나 오류가 발생했을 수 있습니다.</p></div>', unsafe_allow_html=True)
+        if status:
+            st.caption(f'상태: {status}')
+        txt = log_tail()
+        if txt:
+            st.code(txt[-7000:])
+        if st.button('다시 시도', type='primary', use_container_width=True, key='retry_auto_bootstrap'):
+            st.session_state['_cp_auto_bootstrap_attempted'] = False
+            st.rerun()
 
 
 @st.fragment(run_every="20s")
